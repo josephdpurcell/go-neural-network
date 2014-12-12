@@ -6,3 +6,8 @@ Sources:
 
 * http://natureofcode.com/book/chapter-10-neural-networks/
 * http://en.wikipedia.org/wiki/Perceptron
+
+TODO:
+
+* Code a steering perceptron (i.e. a car that avoids certain targets and goes towards others).
+* Find an example for a multi-layer neural network to code.
