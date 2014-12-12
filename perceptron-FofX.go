@@ -1,5 +1,5 @@
 /**
- * A Neural Network Example.
+ * A Neural Network Perceptron Example Learning f(x).
  *
  * This is an example of creating a rudimentary neural network to determine if
  * a given point is above or below a line described by f(x).
@@ -36,30 +36,27 @@ type Perceptron struct {
 }
 
 /**
- * No idea what this method is doing.
+ * This function adjusts each input's weight based on the error.
  */
-func (p Perceptron) train (input [3]float64, desired float64) {
+func (p *Perceptron) train (input [3]float64, desired float64) {
     var guess float64 = p.feedforward(input)
     var error float64 = desired - guess
+    var d float64 = error * p.learning
     for i := 0; i < len(p.weights); i++ {
-        p.weights[i] += error * input[i] * p.learning
+        p.weights[i] = p.weights[i] + (input[i] * d)
     }
-    fmt.Printf("Our guess was: %f, error was: %f", guess, error)
-    fmt.Println()
-    if (guess >= 0) {
-        fmt.Printf("Our guess was that the point %f, %f is above the line f(x) = 10.", input[0], input[1])
+
+    if (guess == desired) {
+        fmt.Printf("Correct! Weights are now: %v", p.weights)
     } else {
-        fmt.Printf("Our guess was that the point %f, %f is below the line f(x) = 10.", input[0], input[1])
+        fmt.Printf("Incorrect. Weights are now: %v", p.weights)
     }
-    fmt.Printf("The weights are now %f, %f, %f.", p.weights[0], p.weights[0], p.weights[0])
     fmt.Println()
 }
 
 /**
  * Feedforward means: here are the inputs for the Perceptron, get the
  * Perceptron to tell us the value.
- *
- * This function doesn't make sense to me yet.
  */
 func (p Perceptron) feedforward (input [3]float64) float64 {
     var sum float64 = 0
@@ -72,7 +69,7 @@ func (p Perceptron) feedforward (input [3]float64) float64 {
 }
 
 /**
- * This doesn't make sense to me yet.
+ * This method determines if the "neruon" should fire (1) or not fire (0).
  */
 func (p Perceptron) activate (sum float64) float64 {
     if (sum > 0) {
@@ -80,13 +77,6 @@ func (p Perceptron) activate (sum float64) float64 {
     } else {
         return -1;
     }
-}
-
-/**
- * Get the weights.
- */
-func (p Perceptron) getWeights () [3]float64 {
-    return p.weights
 }
 
 /**
@@ -112,8 +102,7 @@ func PerceptronFactory (n int, learning float64) Perceptron {
  * This is our line's definition.
  */
 func f(x float64) float64 {
-    return 10
-    //return 2*x + 1
+    return 2*x + 1
 }
 
 /**
@@ -154,16 +143,18 @@ func TrainerFactory () Trainer {
 
 func main() {
     // Setup the trainers.
-    var trainers [20000]Trainer
+    const count int = 100000
+    var trainers [count]Trainer
     for i := 0; i < len(trainers); i++ {
         trainers[i] = TrainerFactory()
     }
 
-    // Learning Constant is low just b/c it's fun to watch, this is not necessarily optimal
+    // Learning Constant is low b/c it's fun to watch, not necessarily for performance.
     p := PerceptronFactory(3, 0.00001)
 
     // Train our Perceptron.
     for i := 0; i < len(trainers); i++ {
+        fmt.Printf("%v: ", i)
         p.train(trainers[i].input, trainers[i].answer)
     }
 }
