@@ -61,10 +61,11 @@ func (p *Perceptron) train (input [3]float64, desired float64) {
     }
 
     if (guess == desired) {
-        fmt.Println("Correct!")
+        fmt.Printf("Correct! Weights are now: %v", p.weights)
     } else {
-        fmt.Println("Incorrect.")
+        fmt.Printf("Incorrect. Weights are now: %v", p.weights)
     }
+    fmt.Println()
 }
 
 /**
@@ -126,29 +127,6 @@ type Trainer struct {
     answer float64
 }
 
-/**
- * Create a Trainer based on x1 and x2
- */
-func TrainerFactory () Trainer {
-    var answer float64
-    var x1 float64 = randomBool()
-    var x2 float64 = randomBool()
-
-    if (nand(x1, x2)) {
-        answer = -1
-    } else {
-        answer = 1
-    }
-
-    var input = [3]float64{x1, x2, 1}
-    t := Trainer{
-        input: input,
-        answer: answer,
-    }
-
-    return t
-}
-
 func main() {
     // Setup the trainers.
     const count int = 180
@@ -160,7 +138,6 @@ func main() {
             input: [3]float64{1, 0, 0},
             answer: 1,
         }
-
 
         key = (i * 4) + 1
         trainers[key] = Trainer{
@@ -186,6 +163,7 @@ func main() {
 
     // Train our Perceptron.
     for i := 0; i < len(trainers); i++ {
+        fmt.Printf("%v: ", i)
         p.train(trainers[i].input, trainers[i].answer)
     }
 }
