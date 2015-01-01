@@ -138,6 +138,7 @@ random3D() - make a random 3D vector
  * An object that can move.
  */
 type Mover struct {
+    brain Perceptron
     location PVector
     velocity PVector
     acceleration PVector
@@ -165,37 +166,58 @@ func (m *Mover) applyForce (f PVector) {
 }
 
 /**
- * Move the object toward the given targets.
+ * Get the steering force toward a target.
  */
-func (m *Mover) seek (targets []PVector) {
+func (m Mover) getSteeringForce (target PVector) PVector {
     var desired PVector
     var steer PVector
     var mag float64
 
-    for i := 0; i < len(targets); i++ {
-        // Compute the desired velocity.
-        // @todo we don't want to normalize and scale by the magnitude in all
-        // directions so we can handle the case where x forces > y forces
-        desired = targets[i].sub(m.location)
-        mag = desired.mag()
-        desired = desired.normalize();
-        // Note: we are saying when the remaining distance is within twice our
-        // max-speed, begin to slow down.
-        if (mag < (m.maxspeed * 2)) {
-            desired = desired.mult(mag / 2);
-        } else {
-            desired = desired.mult(m.maxspeed);
-        }
-
-        // Compute the desired steering force.
-        steer = desired.sub(m.velocity)
-        steer = steer.sub(m.acceleration)
-        steer = steer.mult(m.mass)
-        steer = steer.limit(m.maxforce)
-
-        // Apply the steering force.
-        m.applyForce(steer)
+    // Compute the desired velocity.
+    // @todo we don't want to normalize and scale by the magnitude in all
+    // directions so we can handle the case where x forces > y forces
+    desired = target.sub(m.location)
+    mag = desired.mag()
+    desired = desired.normalize();
+    // Note: we are saying when the remaining distance is within twice our
+    // max-speed, begin to slow down.
+    if (mag < (m.maxspeed * 2)) {
+        desired = desired.mult(mag / 2);
+    } else {
+        desired = desired.mult(m.maxspeed);
     }
+
+    // Compute the desired steering force.
+    steer = desired.sub(m.velocity)
+    steer = steer.sub(m.acceleration)
+    steer = steer.mult(m.mass)
+    steer = steer.limit(m.maxforce)
+
+    return steer
+}
+
+/**
+ * Move the object toward the given targets.
+ */
+func (m *Mover) seek (targets []PVector) {
+    // Gather forces.
+    var forces = make([]PVector, len(targets))
+    for i := 0; i < len(targets); i++ {
+        forces[i] = m.getSteeringForce(targets[i])
+    }
+
+    // Compute the steering force and apply.
+    output := m.brain.feedforward(forces)
+    m.applyForce(output)
+
+    // Train the brain based on the error.
+    desired := PVectorFactory(400, 400)
+    fmt.Printf("DESIRED: %v", desired)
+    fmt.Println()
+    error := desired.sub(m.location)
+    fmt.Printf("ERROR: %v", error)
+    fmt.Println()
+    m.brain.train(forces, error)
 }
 
 /**
@@ -203,6 +225,7 @@ func (m *Mover) seek (targets []PVector) {
  */
 func MoverFactory (location, velocity, acceleration PVector) Mover {
     m := Mover{
+        brain: PerceptronFactory(2, 0.01),
         location: location,
         velocity: velocity,
         acceleration: acceleration,
@@ -224,26 +247,19 @@ func MoverFactory (location, velocity, acceleration PVector) Mover {
  * learning velocity.
  */
 type Perceptron struct {
-    weights [3]float64
+    weights []float64
     learning float64
 }
 
 /**
  * This function adjusts each input's weight based on the error.
  */
-func (p *Perceptron) train (input [3]float64, desired float64) {
-    var guess float64 = p.feedforward(input)
-    var error float64 = desired - guess
-    var d float64 = error * p.learning
+func (p *Perceptron) train (forces []PVector, error PVector) {
     for i := 0; i < len(p.weights); i++ {
-        p.weights[i] = p.weights[i] + (input[i] * d)
+        p.weights[i] = p.weights[i] + (forces[i].x * error.x * p.learning)
+        p.weights[i] = p.weights[i] + (forces[i].y * error.y * p.learning)
     }
-
-    if (guess == desired) {
-        fmt.Printf("Correct! Weights are now: %v", p.weights)
-    } else {
-        fmt.Printf("Incorrect. Weights are now: %v", p.weights)
-    }
+    fmt.Printf("%v", p.weights)
     fmt.Println()
 }
 
@@ -251,36 +267,24 @@ func (p *Perceptron) train (input [3]float64, desired float64) {
  * Feedforward means: here are the inputs for the Perceptron, get the
  * Perceptron to tell us the value.
  */
-func (p Perceptron) feedforward (input [3]float64) float64 {
-    var sum float64 = 0
+func (p Perceptron) feedforward (forces []PVector) PVector {
+    var sum PVector
 
-    for i := 0; i < len(input); i++ {
-        sum += input[i] * p.weights[i]
+    for i := 0; i < len(p.weights); i++ {
+        // Vector addition and multiplication
+        forces[i] = forces[i].mult(p.weights[i]);
+        sum = sum.add(forces[i]);
     }
 
-    return p.activate(sum)
-}
-
-/**
- * This method determines if the "neruon" should fire (1) or not fire (0).
- */
-func (p Perceptron) activate (sum float64) float64 {
-    if (sum > 0) {
-        return 1;
-    } else {
-        return -1;
-    }
+    // No activation function
+    return sum
 }
 
 /**
  * Create a Perceptron.
- *
- * For now, I'm using 3 inputs: x, y, and bias. When I figure out how to have
- * "n" number of arguments for the Perceptron I can actually start using the
- * "n" parameter.
  */
 func PerceptronFactory (n int, learning float64) Perceptron {
-    var weights [3]float64
+    weights := make([]float64, n)
     for i := 0; i < n; i++ {
         weights[i] = random(-1, 1)
     }
@@ -289,49 +293,6 @@ func PerceptronFactory (n int, learning float64) Perceptron {
         learning: learning,
     }
     return p
-}
-
-/**
- * This is our line's definition.
- */
-func f(x float64) float64 {
-    return 2*x + 1
-}
-
-/**
- * A trainer has a point (the input) and the answer (whether or not it is above
- * the line).
- */
-type Trainer struct {
-    input [3]float64
-    answer float64
-}
-
-/**
- * Create a Trainer based on a point.
- */
-func TrainerFactory () Trainer {
-    var xmin float64 = -400
-    var xmax float64 = 400
-    var ymin float64 = -100
-    var ymax float64 = 100
-    var answer float64
-    var x float64 = random(xmin, xmax)
-    var y float64 = random(ymin, ymax)
-
-    if (y < f(x)) {
-        answer = -1
-    } else {
-        answer = 1
-    }
-
-    var input = [3]float64{x, y, 1}
-    t := Trainer{
-        input: input,
-        answer: answer,
-    }
-
-    return t
 }
 
 func main() {
@@ -345,8 +306,8 @@ func main() {
     targets := []PVector{PVectorFactory(200, 200), PVectorFactory(800, 800)}
 
     // External forces.
-    wind := PVectorFactory(1000, 0)
-    gravity := PVectorFactory(0, -0.01 * mover.mass)
+    //wind := PVectorFactory(1000, 0)
+    //gravity := PVectorFactory(0, -0.01 * mover.mass)
     var friction PVector
     var c float64 = 0.01
 
@@ -359,16 +320,17 @@ func main() {
         friction = friction.mult(c)
 
         // Apply external forces.
-        mover.applyForce(friction)
-        mover.applyForce(wind)
-        mover.applyForce(gravity)
+        //mover.applyForce(friction)
+        //mover.applyForce(wind)
+        //mover.applyForce(gravity)
 
         // Seek the target.
         mover.seek(targets)
 
         // Update and display the result.
         mover.update()
-        fmt.Printf("%v", mover.location)
+        fmt.Printf("LOC: %v", mover.location)
+        fmt.Println()
         fmt.Println()
     }
 }
