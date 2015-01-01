@@ -107,7 +107,6 @@ func (v1 PVector) normalize () PVector {
  */
 func (v1 PVector) limit (mag float64) PVector {
     if (v1.mag() > mag) {
-        fmt.Println("LIMIT")
         return v1.normalize().setMag(mag)
     } else {
         return v1
@@ -142,16 +141,17 @@ type Mover struct {
     location PVector
     velocity PVector
     acceleration PVector
-    topspeed float64
+    maxspeed float64
+    maxforce float64
     mass float64
 }
 
 /**
  * Move the object based on acceleration and velocity.
  */
-func (m *Mover) move () {
+func (m *Mover) update () {
     m.velocity = m.velocity.add(m.acceleration)
-    m.velocity = m.velocity.limit(m.topspeed)
+    m.velocity = m.velocity.limit(m.maxspeed)
     m.location = m.location.add(m.velocity)
     m.acceleration = m.acceleration.mult(0)
 }
@@ -160,17 +160,41 @@ func (m *Mover) move () {
  * Apply the given force on the mover.
  */
 func (m *Mover) applyForce (f PVector) {
-    f.div(m.mass)
+    f = f.div(m.mass)
     m.acceleration = m.acceleration.add(f)
 }
 
 /**
  * Move the object toward the given location.
-func (m *Mover) moveToward (loc PVector) {
-    m.velocity = m.velocity.add(m.acceleration).limit(m.topspeed)
-    m.location = m.location.add(m.velocity)
-}
  */
+func (m *Mover) seek (target PVector) {
+    var desired PVector
+    var steer PVector
+    var mag float64
+
+    // Compute the desired velocity.
+    // @todo we don't want to normalize and scale by the magnitude in all
+    // directions so we can handle the case where x forces > y forces
+    desired = target.sub(m.location)
+    mag = desired.mag()
+    desired = desired.normalize();
+    // Note: we are saying when the remaining distance is within twice our
+    // max-speed, begin to slow down.
+    if (mag < (m.maxspeed * 2)) {
+        desired = desired.mult(mag / 2);
+    } else {
+        desired = desired.mult(m.maxspeed);
+    }
+
+    // Compute the desired steering force.
+    steer = desired.sub(m.velocity)
+    steer = steer.sub(m.acceleration)
+    steer = steer.mult(m.mass)
+    steer = steer.limit(m.maxforce)
+
+    // Apply the steering force.
+    m.applyForce(steer)
+}
 
 /**
  * The means of creating a Mover.
@@ -180,7 +204,8 @@ func MoverFactory (location, velocity, acceleration PVector) Mover {
         location: location,
         velocity: velocity,
         acceleration: acceleration,
-        topspeed: 2000,
+        maxspeed: 20,
+        maxforce: 2000,
         mass: 100,
     }
     return m
@@ -314,17 +339,28 @@ func main() {
 
     mover := MoverFactory(location, velocity, acceleration)
 
-    wind := PVectorFactory(0.01, 0)
-    gravity := PVectorFactory(0, -0.01)
+    target := PVectorFactory(200, 200)
 
-    for i := 0; i < 10; i++ {
+    wind := PVectorFactory(1000, 0)
+    gravity := PVectorFactory(0, -0.01 * mover.mass)
+    var c float64 = 0.01
+    var friction PVector
+
+    for i := 0; i < 100; i++ {
+        friction = mover.velocity
+        friction = friction.mult(-1)
+        friction = friction.normalize()
+        friction = friction.mult(c)
+
+        mover.applyForce(friction)
         mover.applyForce(wind)
-        mover.applyForce(gravity.mult(mover.mass))
+        mover.applyForce(gravity)
+
+        mover.seek(target)
+        mover.update()
 
         fmt.Printf("%v", mover.location)
         fmt.Println()
-        fmt.Println()
-        mover.move()
     }
 }
 
