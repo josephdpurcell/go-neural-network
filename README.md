@@ -1,6 +1,10 @@
-As part of learning Golang I have implemented two examples of the Perceptron pattern for a neural network.
+As part of learning Golang I have implemented three examples of the Perceptron pattern for a neural network. These were all inspired by Daniel Shiffman's "The Nature of Code" book.
 
-One is a Perceptron learning f(x) = 2\*x + 1 and another is learning NAND. The NAND example is of course simpler and easier to verify against the WikiPedia page, which shows each iteration and what the values should be.
+The simplest is a Perceptron that learns NAND. This is easy to verify the iterations against the WikiPedia page.
+
+Slightly more complex is the example of a Perceptron learning f(x) = 2\*x + 1. This example is interesting to see how the learning constant affects accuracy and speed of learning.
+
+Lastly, is an example of a Perceptron learning how to "drive". I don't understand this example so ignore it for now.
 
 Sources:
 
@@ -9,5 +13,4 @@ Sources:
 
 TODO:
 
-* Code a steering perceptron (i.e. a car that avoids certain targets and goes towards others).
 * Find an example for a multi-layer neural network to code.
